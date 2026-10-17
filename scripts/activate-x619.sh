@@ -75,8 +75,8 @@ fi
 
 model=unknown
 [[ -r /sys/class/dmi/id/product_name ]] && model=$(</sys/class/dmi/id/product_name)
-[[ $model == MacBookPro13,2 ]] ||
-  fail "recovery is guarded for MacBookPro13,2, not $model"
+[[ $model == MacBookPro13,2 || $model == MacBookPro14,3 ]] ||
+  fail "recovery is guarded for MacBookPro13,2 and MacBookPro14,3, not $model"
 
 for command in lsusb rg plistutil systemd-run systemctl modprobe udevadm findmnt; do
   command -v "$command" >/dev/null 2>&1 || fail "required command is missing: $command"
@@ -191,7 +191,8 @@ else
   say 'no valid same-Mac EFI FDRData; starting Pass A'
   fdr_create_log="$run_dir/fdr-create.private.log"
   fdr_create_runner_log="$run_dir/fdr-create-runner.private.log"
-  install -m 0600 /dev/null "$fdr_create_log" "$fdr_create_runner_log"
+  install -m 0600 /dev/null "$fdr_create_log"
+  install -m 0600 /dev/null "$fdr_create_runner_log"
   start_private_mux
   set +e
   env -u IDEVICERESTORE_T1_FDR_INPUT -u IDEVICERESTORE_T1_PHASE14 -u IDEVICERESTORE_T1_APTICKET_FILE -u IDEVICERESTORE_MEMBOOT_FILE -u IDEVICERESTORE_T1_PREFLIGHT_MEMBOOT_SAVE -u IDEVICERESTORE_T1_PREFLIGHT_TICKET_SAVE LD_LIBRARY_PATH="$library_path" IDEVICERESTORE_T1_EMBEDDEDOS=1 IDEVICERESTORE_T1_FDR_OUTPUT="$fdr_input" IDEVICERESTORE_RESTORE_BOOT_ARGS='rd=md0 -restore IOUSBDeviceController-configuration=standardMuxOnly' "$restore_tool" -y -P -C "$cache_dir" --variant 'Customer Boot' --logfile="$fdr_create_log" "$firmware_dir" >"$fdr_create_runner_log" 2>&1
@@ -209,7 +210,8 @@ else
 fi
 
 say 'starting Pass B: FDR replay plus matching preflight capture'
-install -m 0600 /dev/null "$phase11_log" "$phase11_runner_log"
+install -m 0600 /dev/null "$phase11_log"
+install -m 0600 /dev/null "$phase11_runner_log"
 start_private_mux
 set +e
 env -u IDEVICERESTORE_T1_PHASE14 -u IDEVICERESTORE_T1_APTICKET_FILE -u IDEVICERESTORE_MEMBOOT_FILE LD_LIBRARY_PATH="$library_path" IDEVICERESTORE_T1_EMBEDDEDOS=1 IDEVICERESTORE_T1_FDR_INPUT="$fdr_input" IDEVICERESTORE_T1_FDR_OUTPUT="$fdr_output" IDEVICERESTORE_RESTORE_BOOT_ARGS='rd=md0 -restore IOUSBDeviceController-configuration=standardMuxOnly' IDEVICERESTORE_T1_PREFLIGHT_MEMBOOT_SAVE="$memboot" IDEVICERESTORE_T1_PREFLIGHT_TICKET_SAVE="$apticket" "$restore_tool" -y -P -C "$cache_dir" --variant 'Customer Boot' --logfile="$phase11_log" "$firmware_dir" >"$phase11_runner_log" 2>&1
@@ -238,7 +240,8 @@ sleep 10
 safe_frst
 
 say 'starting exact phase-14 preflight replay'
-install -m 0600 /dev/null "$phase14_log" "$phase14_runner_log"
+install -m 0600 /dev/null "$phase14_log"
+install -m 0600 /dev/null "$phase14_runner_log"
 set +e
 env -u IDEVICERESTORE_T1_EMBEDDEDOS -u IDEVICERESTORE_T1_FDR_INPUT -u IDEVICERESTORE_T1_FDR_OUTPUT -u IDEVICERESTORE_T1_PREFLIGHT_MEMBOOT_SAVE -u IDEVICERESTORE_T1_PREFLIGHT_TICKET_SAVE LD_LIBRARY_PATH="$library_path" IDEVICERESTORE_T1_PHASE14=1 IDEVICERESTORE_MEMBOOT_FILE="$memboot" IDEVICERESTORE_T1_APTICKET_FILE="$apticket" IDEVICERESTORE_RESTORE_BOOT_ARGS='rd=md0' "$restore_tool" -y -P -C "$cache_dir" --variant 'Customer Boot' --logfile="$phase14_log" "$firmware_dir" >"$phase14_runner_log" 2>&1
 phase14_status=$?
@@ -246,6 +249,25 @@ set -e
 (( phase14_status == 0 )) || fail "phase 14 exited with status $phase14_status"
 rg -q 'memboot dispatched with USB bRequest=1' "$phase14_log" "$phase14_runner_log" ||
   fail 'phase 14 did not use the required bRequest=1 transaction'
+
+# first boot can drop the T1 off usb for a bit (~9s on a 14,3), wait it out
+settled_8600=0
+for attempt in $(seq 1 240); do
+  if lsusb -d 05ac:8600 >/dev/null 2>&1; then
+    ((settled_8600 += 1))
+    if (( settled_8600 >= 20 )); then
+      break
+    fi
+  else
+    settled_8600=0
+  fi
+  sleep 0.25
+done
+if (( settled_8600 < 20 )); then
+  lsusb -d 05ac:1281 >/dev/null 2>&1 &&
+    fail 'T1 returned to recovery instead of production mode'
+  fail 'production iBridge did not settle within 60 seconds'
+fi
 
 seen_8600=0
 seen_1281=0

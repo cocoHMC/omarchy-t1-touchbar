@@ -1,8 +1,8 @@
 # Omarchy T1 Touch Bar recovery
 
 Linux-only activation and driver setup for the Apple T1 Touch Bar in the
-2016/2017 Intel MacBook Pro, with an exact, guarded recovery path for the
-`MacBookPro13,2` / `iBridge1,1` / `x619ap` combination.
+2016/2017 Intel MacBook Pro, with an exact, guarded recovery path for
+`MacBookPro13,2` or `MacBookPro14,3` with the `iBridge1,1` / `x619ap` T1.
 
 This repository exists because installing a Linux driver is only half of the
 problem. The driver can bind only after the T1 has passed Apple secure boot and
@@ -53,6 +53,15 @@ The complete live path was verified on:
 - virtual Touch Bar HID bound to `apple-touchbar`
 - the exact live-proven personalized files staged at
   `EFI/APPLE/EMBEDDEDOS`
+
+One MacBookPro14,3 (2017 15-inch, same `x619ap` T1 and `RHUB.ASOC` FRST
+method) has been activated on CachyOS with Linux 7.2. Pass A, Pass B and the
+phase-14 replay completed, the T1 settled as `05ac:8600`, and it came back in
+production mode after a reboot. During its first EmbeddedOS boot the T1 was
+absent for about 9 seconds, which failed the stability check before the script
+waited for `05ac:8600` to settle, so EFI staging on that run was done by hand.
+The settle wait and the script's own EFI staging have not yet run end to end on
+a MacBookPro14,3.
 
 The live bar works, including the firmware Esc key and the Fn/function-key
 layout. The shipped configuration defaults to visible F1-F12 (`fnmode=2`),
@@ -112,9 +121,9 @@ sequence is:
 sudo ./scripts/activate-x619.sh --i-understand-this-flashes-the-t1
 ```
 
-The activation script is intentionally restricted to `MacBookPro13,2`,
-`iBridge1,1`, `x619ap`, and USB recovery ID `05ac:1281`. It stores raw logs,
-FDR data, tickets, and personalized images below root-only
+The activation script is intentionally restricted to `MacBookPro13,2` or
+`MacBookPro14,3`, `iBridge1,1`, `x619ap`, and USB recovery ID `05ac:1281`. It
+stores raw logs, FDR data, tickets, and personalized images below root-only
 `/var/lib/t1-touchbar`; it does not print their contents; and it does not reboot
 the host.
 
