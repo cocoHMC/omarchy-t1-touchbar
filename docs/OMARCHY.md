@@ -1,7 +1,8 @@
 # Omarchy step-by-step
 
 This guide has two paths. Most machines need only the driver. The recovery path
-is only for a verified `MacBookPro13,2` whose T1 appears as `05ac:1281`.
+is only for a verified `MacBookPro13,2` or `MacBookPro14,3` whose T1 appears as
+`05ac:1281`.
 
 No script in this repository reboots or shuts down the Mac.
 
@@ -89,7 +90,8 @@ interfaces. Do not continue into recovery.
 
 Continue only when all are true:
 
-- `cat /sys/class/dmi/id/product_name` is exactly `MacBookPro13,2`;
+- `cat /sys/class/dmi/id/product_name` is exactly `MacBookPro13,2` or
+  `MacBookPro14,3`;
 - `lsusb -d 05ac:1281` shows the T1 recovery device;
 - `lsusb -d 05ac:8600` does not show production iBridge;
 - the computer has reliable AC power and internet access;
@@ -178,7 +180,8 @@ The script performs:
 5. Pass B to replay FDR and capture one matching preflight image/ticket pair;
 6. a ten-second commit wait and another T1-only `FRST`;
 7. exact phase-14 image/ticket replay;
-8. 120 USB samples over 30 seconds;
+8. a wait of up to 60 seconds for `05ac:8600` to stay present for five
+   seconds, then 120 USB samples over 30 seconds;
 9. driver binding and HID verification;
 10. atomic EFI staging only after stable live `05ac:8600`.
 
