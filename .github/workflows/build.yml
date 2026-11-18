@@ -1,13 +1,22 @@
 name: build
 
 on:
-  push:
-  pull_request:
-  schedule:
-    - cron: '0 0 1 * *'
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: Select the affected beta build during owner-requested preparation
+        type: choice
+        required: true
+        default: custom-touchbar
+        options: [custom-touchbar, linux-recovery, macos-recovery, docker-recovery]
+
+concurrency:
+  group: touchbar-beta-preparation
+  cancel-in-progress: false
 
 jobs:
   validate-custom-touchbar:
+    if: github.ref == 'refs/heads/beta' && inputs.scope == 'custom-touchbar'
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -23,6 +32,7 @@ jobs:
           T1_CUSTOM_SKIP_KERNEL=1 ./scripts/build-custom-bar.sh
 
   build-linux-ubuntu:
+    if: github.ref == 'refs/heads/beta' && inputs.scope == 'linux-recovery'
     runs-on: ubuntu-latest
     steps:
     - name: install dependencies
@@ -103,6 +113,7 @@ jobs:
         name: idevicerestore-latest_${{env.target_triplet}}
         path: idevicerestore.tar
   build-macOS:
+    if: github.ref == 'refs/heads/beta' && inputs.scope == 'macos-recovery'
     runs-on: macOS-latest
     steps:
     - name: install dependencies
@@ -331,6 +342,7 @@ jobs:
         name: idevicerestore-latest_${{ matrix.arch }}-${{ env.dest }}
         path: idevicerestore.tar
   build-docker:
+    if: github.ref == 'refs/heads/beta' && inputs.scope == 'docker-recovery'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
